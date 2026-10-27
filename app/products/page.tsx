@@ -1,0 +1,29 @@
+import { ArrowLeft, ArrowRight, Heart, Armchair } from "lucide-react";
+import Link from "next/link";
+
+type Product = { id: string; name: string; category: string | null; image_url: string | null; is_featured: boolean; price: number | string };
+async function getProducts(): Promise<Product[]> {
+  const { createClient } = await import("@supabase/supabase-js");
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return [];
+  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await supabase.from("products").select("id,name,category,image_url,is_featured,price").eq("is_available", true).order("created_at", { ascending: false });
+  if (error) { console.error("Products page query failed:", error.message); return []; }
+  return (data ?? []) as Product[];
+}
+const whatsappNumber = "2349032959952";
+export default async function ProductsPage({ searchParams }: { searchParams: { category?: string; product?: string } }) {
+  const products = await getProducts();
+  const category = searchParams.category ? decodeURIComponent(searchParams.category) : "";
+  const requestedId = searchParams.product ? decodeURIComponent(searchParams.product) : "";
+  const selected = requestedId === "featured-chair" ? products.find(p => /barber chair|high end barber/i.test(p.name)) ?? products[0] : requestedId ? products.find(p => p.id === requestedId) : undefined;
+  const visible = category ? products.filter(p => (p.category ?? "").toLowerCase() === category.toLowerCase() || (category === "Salon Essentials" && /salon|barber|shampoo|clipper|trimmer|groom|waiting|mirror|tool|steriliz|steamer|trolley|razor|scissor/i.test(`${p.name} ${p.category ?? ""}`)) || (category === "Office Furniture" && /office|desk|cabinet|ergonomic|conference|staff|visitor|mesh/i.test(`${p.name} ${p.category ?? ""}`))) : products;
+  const categories = ["All Products", "Salon Essentials", "Office Furniture", "Others"];
+  const wa = (name: string) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(`Hello Bisi Interiors, I would like to enquire about ${name}.`)}`;
+  return <main className="products-page">
+    <header className="products-page-header"><Link href="/" className="products-back"><ArrowLeft size={17}/> Home</Link><Link href="/" className="products-page-brand">BISI INTERIORS <small>NIG LTD</small></Link><a className="products-header-contact" href={wa(selected?.name ?? "your products")} target="_blank" rel="noreferrer">WhatsApp enquiry <ArrowRight size={16}/></a></header>
+    {selected ? <section className="product-detail-page section"><Link className="products-back" href={`/products${category ? `?category=${encodeURIComponent(category)}` : ""}`}><ArrowLeft size={16}/> Back to products</Link><div className="product-detail-layout"><div className="product-detail-image">{selected.image_url ? <img src={selected.image_url} alt={selected.name}/> : <Armchair size={110}/>}</div><div className="product-detail-copy"><span className="section-kicker">BISI INTERIORS NIG LTD</span><h1>{selected.name}</h1><p className="product-detail-category">{selected.category ?? "Furniture & equipment"}</p><p className="product-detail-price">{Number(selected.price || 0) > 0 ? `₦${Number(selected.price).toLocaleString("en-NG", {minimumFractionDigits:2, maximumFractionDigits:2})}` : "Price on WhatsApp enquiry"}</p><p>Contact our team for availability, specifications and delivery details.</p><a className="button button-primary" href={wa(selected.name)} target="_blank" rel="noreferrer">Enquire on WhatsApp <ArrowRight size={18}/></a></div></div></section> : <section className="section products-catalogue"><span className="section-kicker">BISI INTERIORS NIG LTD</span><h1>Our Products</h1><p className="catalogue-intro">Explore furniture and equipment for salons, offices and professional spaces.</p><nav className="catalogue-tabs" aria-label="Product categories">{categories.map(c => <Link key={c} className={(c === "All Products" && !category) || c === category ? "selected" : ""} href={c === "All Products" ? "/products" : `/products?category=${encodeURIComponent(c)}`}>{c}</Link>)}</nav>{category && <h2 className="catalogue-category-title">{category}</h2>}<div className="product-grid catalogue-grid">{visible.map(product => <article className="product-card" key={product.id}><Link href={`/products?product=${encodeURIComponent(product.id)}${category ? `&category=${encodeURIComponent(category)}` : ""}`} className="product-visual" aria-label={`View ${product.name}`}>{product.image_url ? <img src={product.image_url} alt={product.name} loading="lazy"/> : <span className="product-placeholder"><Armchair size={76} strokeWidth={.9}/></span>}<span className="product-heart" aria-hidden="true"><Heart size={18}/></span></Link><div className="product-info"><h3><Link href={`/products?product=${encodeURIComponent(product.id)}`}>{product.name}</Link></h3><p className="product-price">{Number(product.price || 0) > 0 ? `₦${Number(product.price).toLocaleString("en-NG", {minimumFractionDigits:2, maximumFractionDigits:2})}` : "Price on WhatsApp enquiry"}</p><Link href={`/products?product=${encodeURIComponent(product.id)}`}>View details <ArrowRight size={15}/></Link></div></article>)}</div>{visible.length === 0 && <div className="catalogue-empty"><h2>No products in this category yet</h2><p>Try another category or contact us on WhatsApp for help.</p><Link className="button button-primary" href="/products">View all products <ArrowRight size={17}/></Link></div>}</section>}
+    <footer className="products-page-footer"><Link href="/">Bisi Interiors Nig Ltd</Link><span>Design Spaces • Creating Experiences</span><Link href="/about">About Us</Link></footer>
+  </main>;
+}
